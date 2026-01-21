@@ -1,8 +1,6 @@
 spring:
   application:
     name: booking-tour
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:booking-tourdb}
@@ -30,3 +28,8 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
+logging:
+  level:
+    sun.asterisk.booking_tour: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG

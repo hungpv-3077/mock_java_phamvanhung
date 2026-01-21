@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    container_name: booking-tour-postgres
+    environment:
+      POSTGRES_DB: booking-tourdb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - booking-tour-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d booking-tourdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: booking-tour-adminer
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    networks:
+      - booking-tour-network
+    depends_on:
+      - postgres
+    
+volumes:
+  postgres_data:
+
+networks:
+  booking-tour-network:
