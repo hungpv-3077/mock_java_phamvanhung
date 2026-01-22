@@ -74,7 +74,7 @@ public class Booking extends BaseEntity {
     private String contactPhone;
 
     @Column(columnDefinition = "TEXT")
-        private String notes;
+    private String notes;
 
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Review> reviews;
