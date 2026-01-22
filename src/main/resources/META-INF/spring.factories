@@ -1,0 +1,2 @@
+org.springframework.context.ApplicationContextInitializer=\
+sun.asterisk.booking_tour.config.DotenvConfig
