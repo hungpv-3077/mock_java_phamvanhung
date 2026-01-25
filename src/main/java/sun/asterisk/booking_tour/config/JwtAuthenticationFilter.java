@@ -5,8 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -15,8 +13,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import sun.asterisk.booking_tour.entity.Token;
-import sun.asterisk.booking_tour.repository.TokenRepository;
+import sun.asterisk.booking_tour.entity.User;
+import sun.asterisk.booking_tour.repository.UserRepository;
+import sun.asterisk.booking_tour.service.TokenBlacklistService;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -28,7 +27,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     
     private final JwtTokenProvider jwtTokenProvider;
-    private final TokenRepository tokenRepository;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -39,30 +39,59 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String authHeader = request.getHeader("Authorization");
 
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-
-                if (jwtTokenProvider.validateToken(token)) {
-                    String tokenKey = jwtTokenProvider.getTokenKeyFromToken(token);
-                    
-                    Optional<Token> tokenEntity = tokenRepository.findByTokenKeyAndIsRevokedFalse(tokenKey);
-                    
-                    if (tokenEntity.isPresent()) {
-                        Long userId = jwtTokenProvider.getUserIdFromToken(token);
-                        String email = jwtTokenProvider.getEmailFromToken(token);
-
-                        UsernamePasswordAuthenticationToken authentication
-                                = new UsernamePasswordAuthenticationToken(userId, null, null);
-
-                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    } else {
-                        logger.warn("Token has been revoked or not found: {}", tokenKey);
-                    }
-                }
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                filterChain.doFilter(request, response);
+                return;
             }
+
+            String token = authHeader.substring(7);
+
+            if (!jwtTokenProvider.validateToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String tokenKey = jwtTokenProvider.getTokenKeyFromToken(token);
+            
+            if (tokenBlacklistService.isBlacklisted(tokenKey)) {
+                logger.warn("Token has been revoked: {}", tokenKey);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+                return;
+            }
+
+            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            Optional<User> userOptional = userRepository.findByIdWithRole(userId);
+            
+            if (!userOptional.isPresent()) {
+                logger.warn("User not found with ID: {}", userId);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found");
+                return;
+            }
+
+            User user = userOptional.get();
+            CustomUserDetails userDetails = new CustomUserDetails(
+                    user.id(),
+                    user.firstName(),
+                    user.lastName(),
+                    user.email(),
+                    user.phone(),
+                    user.dateOfBirth(),
+                    user.avatarUrl(),
+                    user.isVerified(),
+                    user.status(),
+                    user.role() != null ? user.role().name() : null
+            );
+
+            UsernamePasswordAuthenticationToken authentication
+                    = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
         } catch (Exception e) {
             logger.error("Cannot set user authentication", e);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentication failed");
+            return;
         }
 
         filterChain.doFilter(request, response);

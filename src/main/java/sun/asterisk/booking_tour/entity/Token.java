@@ -45,13 +45,6 @@ public class Token extends BaseEntity {
     @Column(name = "refresh_expires_at", nullable = false)
     private LocalDateTime refreshExpiresAt;
 
-    @Builder.Default
-    @Column(name = "is_revoked", nullable = false)
-    private Boolean isRevoked = false;
-
-    @Column(name = "revoked_at")
-    private LocalDateTime revokedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

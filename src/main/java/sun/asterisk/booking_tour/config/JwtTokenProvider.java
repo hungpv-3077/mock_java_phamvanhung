@@ -15,17 +15,21 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import sun.asterisk.booking_tour.entity.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
+
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:3600000}") // 1 hour
+    @Value("${jwt.expiration}") // 1 hour
     private long jwtExpiration;
 
-    @Value("${jwt.refresh-expiration:604800000}") // 7 days
+    @Value("${jwt.refresh-expiration}") // 7 days
     private long refreshExpiration;
 
     private SecretKey getSigningKey() {
@@ -44,7 +48,7 @@ public class JwtTokenProvider {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("email", user.getEmail());
-        claims.put("role", user.getRole() != null ? user.getRole().getId() : null);
+        claims.put("roleName", user.getRole() != null ? user.getRole().getName() : null);
         claims.put("tokenKey", tokenKey); // UUID key for token management
 
         return Jwts.builder()
@@ -117,6 +121,15 @@ public class JwtTokenProvider {
         return claims.get("userId", Long.class);
     }
 
+    public String getRoleNameFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return claims.get("roleName", String.class);
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
@@ -125,6 +138,7 @@ public class JwtTokenProvider {
                     .parseSignedClaims(token);
             return true;
         } catch (Exception e) {
+            logger.error("Invalid JWT token: {}", e.getMessage());
             return false;
         }
     }

@@ -1,6 +1,6 @@
 package sun.asterisk.booking_tour.controller.client;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 import org.springframework.http.HttpStatus;
@@ -164,7 +164,7 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(LogoutResponse.builder()
                             .message("Invalid authorization header format")
-                            .timestamp(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                            .timestamp(ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME))
                             .build());
         }
         
@@ -173,7 +173,7 @@ public class AuthController {
         
         return ResponseEntity.ok(LogoutResponse.builder()
                 .message("Logout successful")
-                .timestamp(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .timestamp(ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME))
                 .build());
     }
 }

@@ -22,17 +22,21 @@ import sun.asterisk.booking_tour.repository.RoleRepository;
 import sun.asterisk.booking_tour.repository.TokenRepository;
 import sun.asterisk.booking_tour.repository.UserRepository;
 import sun.asterisk.booking_tour.enums.AuthProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final WebClient.Builder webClientBuilder;
     private final RoleRepository roleRepository;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${oauth.google.client-id}")
     private String googleClientId;
@@ -74,7 +78,7 @@ public class AuthService {
             return generateAuthResponse(user);
 
         } catch (Exception e) {
-            log.error("Error verifying Google code", e);
+            logger.error("Error verifying Google code", e);
             throw new ValidationException("Invalid Google authorization code");
         }
     }
@@ -93,7 +97,7 @@ public class AuthService {
             return generateAuthResponse(user);
 
         } catch (Exception e) {
-            log.error("Error verifying Facebook code", e);
+            logger.error("Error verifying Facebook code", e);
             throw new ValidationException("Invalid Facebook authorization code");
         }
     }
@@ -112,43 +116,32 @@ public class AuthService {
             return generateAuthResponse(user);
 
         } catch (Exception e) {
-            log.error("Error verifying Twitter code", e);
+            logger.error("Error verifying Twitter code", e);
             throw new ValidationException("Invalid Twitter authorization code");
         }
     }
 
     /**
-     * Logout user by revoking token
+     * Logout user by revoking token in Redis blacklist
      */
     @Transactional
     public void logout(String accessToken) {
-        try {
-            if (!jwtTokenProvider.validateToken(accessToken)) {
-                throw new ValidationException("Invalid or expired token");
-            }
-
-            String tokenKey = jwtTokenProvider.getTokenKeyFromToken(accessToken);
-
-            if (tokenKey == null || tokenKey.isEmpty()) {
-                throw new ValidationException("Token key not found in token payload");
-            }
-
-            int revokedCount = tokenRepository.revokeByTokenKey(tokenKey, LocalDateTime.now());
-
-            if (revokedCount == 0) {
-                log.warn("Token key not found in database or already revoked: {}", tokenKey);
-                throw new ValidationException("Token not found or already revoked");
-            }
-
-            log.info("Successfully revoked token with key: {}", tokenKey);
-
-        } catch (Exception e) {
-            log.error("Error during logout", e);
-            if (e instanceof ValidationException) {
-                throw e;
-            }
-            throw new ValidationException("Logout failed: " + e.getMessage());
+        if (!jwtTokenProvider.validateToken(accessToken)) {
+            throw new ValidationException("Invalid or expired token");
         }
+
+        String tokenKey = jwtTokenProvider.getTokenKeyFromToken(accessToken);
+
+        if (tokenKey == null || tokenKey.isEmpty()) {
+            throw new ValidationException("Token key not found in token payload");
+        }
+
+        // Add token to Redis blacklist with TTL matching JWT expiration
+        long ttlSeconds = jwtTokenProvider.getJwtExpiration();
+        tokenBlacklistService.blacklistToken(tokenKey, ttlSeconds);
+
+        logger.info("Successfully blacklisted token with key: {}", tokenKey);
+
     }
 
     /**
@@ -157,21 +150,26 @@ public class AuthService {
     private String exchangeGoogleCodeForToken(String code) {
         WebClient webClient = webClientBuilder.build();
 
-        GoogleTokenResponse response = webClient.post()
-                .uri("https://oauth2.googleapis.com/token")
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .bodyValue(String.format(
-                        "grant_type=authorization_code&code=%s&redirect_uri=%s&client_id=%s&client_secret=%s",
-                        code, googleRedirectUri, googleClientId, googleClientSecret))
-                .retrieve()
-                .bodyToMono(GoogleTokenResponse.class)
-                .block();
+        try {
+            GoogleTokenResponse response = webClient.post()
+                    .uri("https://oauth2.googleapis.com/token")
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .bodyValue(String.format(
+                            "grant_type=authorization_code&code=%s&redirect_uri=%s&client_id=%s&client_secret=%s",
+                            code, googleRedirectUri, googleClientId, googleClientSecret))
+                    .retrieve()
+                    .bodyToMono(GoogleTokenResponse.class)
+                    .block();
 
-        if (response == null || response.getAccessToken() == null) {
-            throw new ValidationException("Failed to exchange Google code for token");
+            if (response == null || response.getAccessToken() == null) {
+                throw new ValidationException("Failed to exchange Google code for token");
+            }
+
+            return response.getAccessToken();
+        } catch (Exception e) {
+            logger.error("Failed to exchange Google code: {}", e.getMessage());
+            throw new ValidationException("Failed to exchange Google authorization code. Please ensure the code is valid and not expired.");
         }
-
-        return response.getAccessToken();
     }
 
     /**
@@ -345,7 +343,7 @@ public class AuthService {
                     newUser.setRole(userRole);
 
                     User savedUser = userRepository.save(newUser);
-                    log.info("Created new user with email: {} and assigned role: {}", savedUser.getEmail(), userRole.getName());
+                    logger.info("Created new user with email: {} and assigned role: {}", savedUser.getEmail(), userRole.getName());
 
                     return savedUser;
                 });
@@ -375,12 +373,11 @@ public class AuthService {
                 .user(user)
                 .expiresAt(accessExpiresAt)
                 .refreshExpiresAt(refreshExpiresAt)
-                .isRevoked(false)
                 .build();
 
         tokenRepository.save(token);
 
-        log.info("Generated and saved new token for user: {} with key: {}", user.getEmail(), tokenKey);
+        logger.info("Generated and saved new token for user: {} with key: {}", user.getEmail(), tokenKey);
 
         // Build user response
         UserResponse userResponse = UserResponse.builder()
