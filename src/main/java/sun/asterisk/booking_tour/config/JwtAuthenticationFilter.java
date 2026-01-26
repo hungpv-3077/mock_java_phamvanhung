@@ -69,18 +69,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             User user = userOptional.get();
-            CustomUserDetails userDetails = new CustomUserDetails(
-                    user.id(),
-                    user.firstName(),
-                    user.lastName(),
-                    user.email(),
-                    user.phone(),
-                    user.dateOfBirth(),
-                    user.avatarUrl(),
-                    user.isVerified(),
-                    user.status(),
-                    user.role() != null ? user.role().name() : null
-            );
+            CustomUserDetails userDetails = CustomUserDetails.builder()
+                    .userId(user.getId())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .email(user.getEmail())
+                    .phone(user.getPhone())
+                    .dateOfBirth(user.getDateOfBirth())
+                    .avatarUrl(user.getAvatarUrl())
+                    .isVerified(user.getIsVerified())
+                    .status(user.getStatus())
+                    .roleName(user.getRole() != null ? user.getRole().getName() : null)
+                    .build();
 
             UsernamePasswordAuthenticationToken authentication
                     = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
