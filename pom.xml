@@ -114,6 +114,25 @@
 		<artifactId>spring-boot-starter-data-redis</artifactId>
 	</dependency>
 
+	<!-- RabbitMQ for asynchronous messaging -->
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-amqp</artifactId>
+	</dependency>
+
+	<!-- RabbitMQ JMS Client for JMS messaging (includes JMS API) -->
+	<dependency>
+		<groupId>com.rabbitmq.jms</groupId>
+		<artifactId>rabbitmq-jms</artifactId>
+		<version>3.2.0</version>
+	</dependency>
+
+	<!-- Spring JMS support -->
+	<dependency>
+		<groupId>org.springframework</groupId>
+		<artifactId>spring-jms</artifactId>
+	</dependency>
+
 	<!-- Stripe -->
 	<dependency>
 		<groupId>com.stripe</groupId>
@@ -129,6 +148,12 @@
 	<dependency>
 		<groupId>org.thymeleaf.extras</groupId>
 		<artifactId>thymeleaf-extras-springsecurity6</artifactId>
+	</dependency>
+
+	<!-- WebSocket for real-time notifications -->
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-websocket</artifactId>
 	</dependency>
 
 	<dependency>

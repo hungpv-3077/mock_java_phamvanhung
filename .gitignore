@@ -40,3 +40,6 @@ app.log
 
 ### Uploaded files ###
 uploads/
+
+### CSV Exports ###
+exports/

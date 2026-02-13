@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import sun.asterisk.booking_tour.dto.booking.CreateBookingRequest;
 import sun.asterisk.booking_tour.dto.booking.CreateBookingResponse;
+import sun.asterisk.booking_tour.dto.email.BookingEmailMessage;
 import sun.asterisk.booking_tour.entity.Booking;
 import sun.asterisk.booking_tour.entity.Tour;
 import sun.asterisk.booking_tour.entity.TourDeparture;
@@ -30,6 +31,7 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final TourDepartureRepository tourDepartureRepository;
+    private final EmailMessageProducer emailMessageProducer;
 
     @Transactional
     public CreateBookingResponse createBooking(CreateBookingRequest request) {
@@ -75,11 +77,40 @@ public class BookingService {
 
         bookingRepository.save(booking);
 
+        // Send email notification via RabbitMQ
+        sendBookingEmailNotification(booking);
+
         return CreateBookingResponse.builder()
                 .code(booking.getCode())
                 .status(booking.getStatus())
                 .finalTotal(booking.getFinalTotal())
                 .build();
+    }
+
+    private void sendBookingEmailNotification(Booking booking) {
+        try {
+            TourDeparture departure = booking.getTourDeparture();
+            Tour tour = departure != null ? departure.getTour() : null;
+            String tourName = tour != null && tour.getName() != null ? tour.getName() : "Unknown Tour";
+
+            BookingEmailMessage emailMessage = BookingEmailMessage.builder()
+                    .bookingCode(booking.getCode())
+                    .tourName(tourName)
+                    .departureDate(departure != null ? departure.getDepartureDate() : null)
+                    .numAdults(booking.getNumAdults())
+                    .numChildren(booking.getNumChildren())
+                    .finalTotal(booking.getFinalTotal())
+                    .contactName(booking.getContactName())
+                    .contactEmail(booking.getContactEmail())
+                    .contactPhone(booking.getContactPhone())
+                    .status(booking.getStatus().name())
+                    .build();
+
+            emailMessageProducer.sendBookingEmail(emailMessage);
+        } catch (Exception e) {
+            System.err.println("Failed to send booking email notification: " + e.getMessage());
+            throw new RuntimeException("Failed to send booking email notification", e);
+        }
     }
 
     private String generateBookingCode() {

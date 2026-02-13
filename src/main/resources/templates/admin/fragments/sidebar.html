@@ -58,6 +58,13 @@
                         Manage Category
                     </a>
                 </li>
+                <li>
+                    <a href="/admin/payments" class="flex items-center p-3 rounded hover:bg-gray-700 transition"
+                       th:classappend="${#strings.equals(activePage, 'payments')} ? 'bg-gray-700' : ''">
+                        <i class="fas fa-bell mr-3"></i>
+                        Payment Notifications
+                    </a>
+                </li>
             </ul>
         </nav>
         <div class="p-4 border-t border-gray-700">

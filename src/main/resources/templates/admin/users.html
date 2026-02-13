@@ -18,10 +18,17 @@
             <header class="bg-white shadow-sm">
                 <div class="flex items-center justify-between p-4">
                     <h1 class="text-2xl font-semibold text-gray-800">User Management</h1>
-                    <a href="/admin/users/add" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
-                        <i class="fas fa-plus mr-2"></i>
-                        Thêm User
-                    </a>
+                    <div class="flex items-center gap-3">
+                        <a th:href="@{/admin/users/export/csv(search=${search}, status=${selectedStatus})}" 
+                           class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center">
+                            <i class="fas fa-file-csv mr-2"></i>
+                            Export CSV
+                        </a>
+                        <a href="/admin/users/add" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+                            <i class="fas fa-plus mr-2"></i>
+                            Thêm User
+                        </a>
+                    </div>
                 </div>
             </header>
 

@@ -56,10 +56,30 @@ services:
       - "8025:8025"
     networks:
       - booking-tour-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: booking-tour-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - booking-tour-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     
 volumes:
   postgres_data:
   redis_data:
+  rabbitmq_data:
 
 networks:
   booking-tour-network:

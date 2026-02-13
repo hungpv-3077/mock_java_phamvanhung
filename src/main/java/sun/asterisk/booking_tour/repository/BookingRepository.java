@@ -102,4 +102,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByStatusNot(BookingStatus status, Pageable pageable);
 
     Long countByStatus(BookingStatus status);
+
+    // Auto-cancellation queries
+    @Query("SELECT b FROM Booking b " +
+           "JOIN FETCH b.tourDeparture td " +
+           "WHERE b.status = :status " +
+           "AND b.createdAt < :expirationTime")
+    List<Booking> findPendingBookingsOlderThan(
+        @Param("status") BookingStatus status,
+        @Param("expirationTime") LocalDateTime expirationTime
+    );
 }

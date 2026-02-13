@@ -37,15 +37,19 @@ public class PaymentService {
 
     private final EmailQueueService emailQueueService;
 
+    private final NotificationService notificationService;
+
     public PaymentService(
             BookingRepository bookingRepository,
             PaymentRepository paymentRepository,
             StripeProperties stripeProperties,
-            EmailQueueService emailQueueService) {
+            EmailQueueService emailQueueService,
+            NotificationService notificationService) {
         this.bookingRepository = bookingRepository;
         this.paymentRepository = paymentRepository;
         this.stripeProperties = stripeProperties;
         this.emailQueueService = emailQueueService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -150,6 +154,13 @@ public class PaymentService {
                     logger.warn("Enqueued payment success email job. bookingCode={}, to={}", bookingCode, toEmail);
                 } catch (Exception e) {
                     logger.error("Failed to enqueue payment success email job. bookingCode={}, to={}", bookingCode, toEmail, e);
+                }
+
+                // Send WebSocket notification to admin
+                try {
+                    notificationService.sendBookingSuccessNotification(booking);
+                } catch (Exception e) {
+                    logger.error("Failed to send WebSocket notification for booking: {}", bookingCode, e);
                 }
             }
 

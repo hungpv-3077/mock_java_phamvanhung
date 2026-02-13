@@ -1,15 +1,24 @@
 package sun.asterisk.booking_tour.controller.admin;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -29,6 +38,7 @@ import sun.asterisk.booking_tour.dto.user.AdminUserListResponse;
 import sun.asterisk.booking_tour.dto.user.AdminUserRequest;
 import sun.asterisk.booking_tour.enums.UserStatus;
 import sun.asterisk.booking_tour.service.AdminUserService;
+import sun.asterisk.booking_tour.service.UserCsvExportService;
 
 @Controller
 @RequestMapping("/admin/users")
@@ -37,6 +47,7 @@ import sun.asterisk.booking_tour.service.AdminUserService;
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
+    private final UserCsvExportService userCsvExportService;
 
     private static List<String> statusNames() {
         return Arrays.stream(UserStatus.values())
@@ -209,5 +220,51 @@ public class AdminUserController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         return "redirect:/admin/users";
+    }
+
+    @GetMapping("/export/csv")
+    public ResponseEntity<?> exportUsersToCsv(
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "status", required = false) UserStatus status,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            log.info("Starting CSV export - search: {}, status: {}", search, status);
+
+            CompletableFuture<String> futureFilePath = userCsvExportService.exportUsersToCsv(search, status);
+            String filePath = futureFilePath.get();
+
+            File file = new File(filePath);
+            if (!file.exists()) {
+                log.error("CSV file not found: {}", filePath);
+                return ResponseEntity.notFound().build();
+            }
+
+            InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+            headers.add(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate");
+            headers.add(HttpHeaders.PRAGMA, "no-cache");
+            headers.add(HttpHeaders.EXPIRES, "0");
+
+            log.info("CSV export completed successfully. File size: {} bytes", file.length());
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .contentLength(file.length())
+                    .contentType(MediaType.parseMediaType("text/csv"))
+                    .body(resource);
+
+        } catch (Exception e) {
+            log.error("Error exporting users to CSV", e);
+            return ResponseEntity.internalServerError()
+                    .body("Error exporting users: " + e.getMessage());
+        }
+    }
+    
+    @GetMapping("/export/csv/all")
+    public ResponseEntity<?> exportAllUsersToCsv() {
+        return exportUsersToCsv(null, null, null);
     }
 }
